@@ -22,13 +22,16 @@ class PlayerController(
 ) {
 
     @GetMapping
-    fun getAllPlayers(): ResponseEntity<ApiResponse<List<Player>>> {
+    fun getAllPlayers(): ResponseEntity<ApiResponse<Map<String, Any>>> {
         val players = playerService.getAllPlayers()
         return ResponseEntity.ok(
             ApiResponse(
                 success = true,
-                message = "Players retrieved successfully",
-                data = players
+                message = "Found ${players.size} players",
+                data = mapOf(
+                    "total" to players.size,
+                    "players" to players
+                )
             )
         )
     }
