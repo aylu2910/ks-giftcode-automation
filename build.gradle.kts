@@ -38,6 +38,9 @@ dependencies {
 	runtimeOnly("com.h2database:h2")
 	implementation("org.springframework.boot:spring-boot-h2console")
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+	implementation("com.github.loki4j:loki-logback-appender:1.5.2")
 
 }
 
