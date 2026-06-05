@@ -15,6 +15,11 @@ interface RedemptionLogRepository : JpaRepository<RedemptionLog, Long> {
         status: RedemptionStatus
     ): Boolean
 
+    fun countByCodeAndStatusIn(
+        code: String,
+        statuses: Collection<RedemptionStatus>
+    ): Long
+
     fun findByUserIdAndCode(
         userId: String,
         code: String
