@@ -4,5 +4,6 @@ data class PlayerRegistrationResult(
     val playerId: String,
     val success: Boolean,
     val playerName: String? = null,
+    val playerKingdom: String? = null,
     val message: String
 )

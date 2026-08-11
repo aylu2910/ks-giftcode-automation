@@ -76,6 +76,7 @@ class PlayerController(
                     onSuccess = {
                         PlayerRegistrationResult(
                             playerId = playerIdStr,
+                            playerKingdom = playerInfo.kingdom.toString(),
                             success = true,
                             playerName = playerInfo.name,
                             message = "Player $playerId (${playerInfo.name}) added successfully"
@@ -84,6 +85,7 @@ class PlayerController(
                     onFailure = {
                         PlayerRegistrationResult(
                             playerId = playerIdStr,
+                            playerKingdom = null,
                             success = false,
                             message = it.message ?: "Unknown error"
                         )
