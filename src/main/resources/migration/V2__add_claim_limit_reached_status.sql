@@ -1,0 +1,2 @@
+-- H2: Convert ENUM column to VARCHAR to allow CLAIM_LIMIT_REACHED
+ALTER TABLE redemption_log ALTER COLUMN status VARCHAR(255) NOT NULL;
