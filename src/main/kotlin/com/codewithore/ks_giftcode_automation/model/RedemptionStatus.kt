@@ -3,7 +3,7 @@ package com.codewithore.ks_giftcode_automation.model
 enum class RedemptionStatus(val message: String) {
     PENDING("Redemption in progress."),
     SUCCESS("Redeemed, please claim the rewards in your mail!"),
-    ALREADY_REDEEMED("Already claimed, unable to claim again."),
+    ALREADY_REDEEMED("Gift has already been claimed!"),
     INVALID_CODE("Gift Code not found, this is case-sensitive!"),
     EXPIRED("Expired, unable to claim."),
     CLAIM_LIMIT_REACHED("Claim limit reached, unable to claim."),
