@@ -5,7 +5,6 @@ import com.codewithore.ks_giftcode_automation.client.RateLimitException
 import com.codewithore.ks_giftcode_automation.dto.AddPlayersRequest
 import com.codewithore.ks_giftcode_automation.dto.ApiResponse
 import com.codewithore.ks_giftcode_automation.dto.PlayerRegistrationResult
-import com.codewithore.ks_giftcode_automation.entity.Player
 import com.codewithore.ks_giftcode_automation.model.PlayerInfoData
 import com.codewithore.ks_giftcode_automation.repository.PlayerRepository
 import com.codewithore.ks_giftcode_automation.service.PlayerService
@@ -70,8 +69,8 @@ class PlayerController(
                 )
             }
 
-            // Save to DB with in-game name
-            runCatching { playerService.addPlayer(playerIdStr, playerInfo.name) }
+            // Save to DB with in-game name and kingdom
+            runCatching { playerService.addPlayer(playerIdStr, playerInfo.name, playerInfo.kingdom.toString()) }
                 .fold(
                     onSuccess = {
                         PlayerRegistrationResult(
