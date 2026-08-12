@@ -2,6 +2,7 @@ package com.codewithore.ks_giftcode_automation.service
 
 import com.codewithore.ks_giftcode_automation.config.AutomationConfig
 import com.codewithore.ks_giftcode_automation.config.RetryConfig
+import com.codewithore.ks_giftcode_automation.entity.Player
 import com.codewithore.ks_giftcode_automation.entity.RedemptionLog
 import com.codewithore.ks_giftcode_automation.model.GiftCode
 import com.codewithore.ks_giftcode_automation.model.RedemptionStatus
@@ -26,6 +27,7 @@ class RedemptionAutomator(
     companion object {
         const val REDEMPTION_URL = "https://ks-giftcode.centurygame.com/"
         const val SELECTOR_PLAYER_ID = "input[placeholder='Player ID']"
+        const val SELECTOR_KINGDOM = "input[placeholder='Kingdom']"
         const val SELECTOR_LOGIN_BTN = "div.btn.login_btn"
         const val SELECTOR_LOGIN_BTN_ACTIVE = "div.btn.login_btn:not(.disabled)"
         const val SELECTOR_GIFT_CODE = "input[placeholder='Enter Gift Code']"
@@ -44,27 +46,33 @@ class RedemptionAutomator(
      */
     fun redeemAllCodesForUser(
         page: Page,
-        userId: String,
+        player: Player,
         codes: List<GiftCode>
     ): Boolean {
-        logger.info("Processing user: {}", userId)
+        val playerId = player.playerId
+        val playerName = player.playerName
+        val playerKingdom = player.kingdom.toString()
 
-        // Step 1 — Login
-        val playerName = loginUser(page, userId) ?: return true
+        logger.info("Processing user: {}", player.id)
+
+        // Step 1 — fill in user details
+
+        page.fill(SELECTOR_PLAYER_ID, playerId)
+        page.fill(SELECTOR_KINGDOM, playerKingdom)
 
         // Step 2 — Redeem each code
         for (code in codes) {
 
             // Skip if already successfully redeemed
             if (redemptionLogRepository.existsByUserIdAndCodeAndStatus(
-                    userId, code.code, RedemptionStatus.SUCCESS
+                    playerId, code.code, RedemptionStatus.SUCCESS
                 )
             ) {
-                logger.info("Skipping code {} for user {} - {} — already redeemed based on RedemptionStatus.SUCCESS", code.code, userId, playerName)
+                logger.info("Skipping code {} for user {} - {} — already redeemed based on RedemptionStatus.SUCCESS", code.code, playerId, playerName)
                 continue
             }
 
-            val hardStop = redeemCodeWithRetry(page, userId, playerName, code)
+            val hardStop = redeemCodeWithRetry(page, playerId, playerKingdom, playerName, code)
             if (hardStop) return false
         }
 
@@ -73,61 +81,11 @@ class RedemptionAutomator(
         return true
     }
 
-    private fun loginUser(page: Page, userId: String): String? {
-        return try {
-            page.fill(SELECTOR_PLAYER_ID, userId)
-
-            // Wait for login button to become active (disabled class removed)
-            page.waitForSelector(
-                SELECTOR_LOGIN_BTN_ACTIVE,
-                Page.WaitForSelectorOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(automationConfig.timeoutMs.toDouble())
-            )
-            page.click(SELECTOR_LOGIN_BTN)
-
-            // Wait for either player name (success) or modal (error)
-            page.waitForSelector(
-                "$SELECTOR_PLAYER_NAME, $SELECTOR_MODAL",
-                Page.WaitForSelectorOptions()
-                    .setTimeout(automationConfig.timeoutMs.toDouble() * 5)
-            )
-
-            // Check if player name appeared (successful login)
-            val playerNameElement = page.querySelector(SELECTOR_PLAYER_NAME)
-            if (playerNameElement != null && playerNameElement.isVisible) {
-                val playerName = playerNameElement.innerText()
-                logger.info("Logged in as: {} ({})", playerName, userId)
-                return playerName
-            }
-
-            // Otherwise check for error modal
-            val modalText = page.innerText(SELECTOR_MODAL_MSG)
-            val status = RedemptionStatus.fromMessage(modalText)
-
-            if (status in RedemptionStatus.SKIP_USER) {
-                logger.warn("Login failed for user {}: {}", userId, modalText)
-                saveLog(userId, null, "LOGIN", status, 1, modalText)
-                page.click(SELECTOR_CONFIRM_BTN)
-                return null
-            }
-
-            // Unexpected state — use userId as fallback
-            val playerName = userId
-
-            logger.info("Logged in as: {} ({})", playerName, userId)
-            playerName
-
-        } catch (e: Exception) {
-            logger.error("Unexpected error during login for user {}: {}", userId, e.message)
-            null
-        }
-    }
-
     private fun redeemCodeWithRetry(
         page: Page,
-        userId: String,
-        playerName: String,
+        playerId: String,
+        playerKingdom: String,
+        playerName: String?,
         code: GiftCode
     ): Boolean {
         var attempt = 1
@@ -136,11 +94,11 @@ class RedemptionAutomator(
         while (attempt <= retryConfig.maxAttempts) {
             logger.info(
                 "Redeeming code {} for user {} — attempt {}/{}",
-                code.code, userId, attempt, retryConfig.maxAttempts
+                code.code, playerId, attempt, retryConfig.maxAttempts
             )
 
             // Write PENDING before attempting
-            val log = saveLog(userId, playerName, code.code, RedemptionStatus.PENDING, attempt, null)
+            val log = saveLog(playerId, playerName, playerKingdom, code.code, RedemptionStatus.PENDING, attempt, null)
 
             val status = attemptRedemption(page, code.code)
 
@@ -149,7 +107,7 @@ class RedemptionAutomator(
 
             when {
                 status == RedemptionStatus.SUCCESS -> {
-                    logger.info("✅ Code {} redeemed for user {} - {}", code.code, userId, playerName)
+                    logger.info("✅ Code {} redeemed for user {} - {}", code.code, playerId, playerName)
                     return false
                 }
                 status in RedemptionStatus.HARD_STOP -> {
@@ -157,20 +115,20 @@ class RedemptionAutomator(
                     return true
                 }
                 status == RedemptionStatus.ALREADY_REDEEMED -> {
-                    logger.info("⏭️ Code {} already redeemed for user {} - {}", code.code, userId, playerName)
+                    logger.info("⏭️ Code {} already redeemed for user {} - {}", code.code, playerId, playerName)
                     return false
                 }
                 status in RedemptionStatus.RETRYABLE && attempt < retryConfig.maxAttempts -> {
                     logger.warn(
                         "⚠️ Retryable error for code {} user {} - {} — waiting {}ms",
-                        code.code, userId, playerName, delayMs
+                        code.code, playerId, playerName, delayMs
                     )
                     Thread.sleep(delayMs)
                     delayMs *= retryConfig.backoffMultiplier
                     attempt++
                 }
                 else -> {
-                    logger.error("❌ Code {} failed for user {} - {} after {} attempts", code.code, userId, playerName, attempt)
+                    logger.error("❌ Code {} failed for user {} - {} after {} attempts", code.code, playerId, playerName, attempt)
                     updateLog(log, RedemptionStatus.FAILED)
                     return false
                 }
@@ -215,6 +173,7 @@ class RedemptionAutomator(
     fun saveLog(
         userId: String,
         playerName: String?,
+        playerKingdom: String?,
         code: String,
         status: RedemptionStatus,
         attemptNumber: Int,
@@ -224,6 +183,7 @@ class RedemptionAutomator(
             RedemptionLog(
                 userId = userId,
                 player = playerName,
+                kingdom = playerKingdom,
                 code = code,
                 status = status,
                 attemptNumber = attemptNumber,
