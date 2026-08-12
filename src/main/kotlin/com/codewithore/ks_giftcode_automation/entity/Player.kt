@@ -17,6 +17,13 @@ data class Player(
     @Column(name = "player_name")
     val playerName: String? = null,
 
+    @Column(name = "kingdom")
+    val kingdom: String? = null,
+
+    @Column(name = "kingdom_updated_at")
+    val kingdomUpdatedAt: LocalDate? = null,
+
+
     @Column(name = "added_at", nullable = false)
     val addedAt: LocalDate = LocalDate.now()
 )
