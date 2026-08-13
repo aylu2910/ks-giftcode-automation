@@ -9,7 +9,6 @@ import com.codewithore.ks_giftcode_automation.model.RedemptionStatus
 import com.codewithore.ks_giftcode_automation.repository.RedemptionLogRepository
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
-import com.microsoft.playwright.options.WaitForSelectorState
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -25,18 +24,17 @@ class RedemptionAutomator(
     private val logger = LoggerFactory.getLogger(RedemptionAutomator::class.java)
 
     companion object {
-        const val REDEMPTION_URL = "https://ks-giftcode.centurygame.com/"
-        const val SELECTOR_PLAYER_ID = "input[placeholder='Player ID']"
-        const val SELECTOR_KINGDOM = "input[placeholder='Kingdom']"
-        const val SELECTOR_LOGIN_BTN = "div.btn.login_btn"
-        const val SELECTOR_LOGIN_BTN_ACTIVE = "div.btn.login_btn:not(.disabled)"
+        const val REDEMPTION_URL = "https://kingshot.net/gift-codes/redeem"
+        const val SELECTOR_PLAYER_ID = "#playerId"
+        const val BTN_CONTINUE = "button[type='submit']:has-text('Continue')"
+        const val SELECTOR_PLAYER_CARD = "[data-slot='card-content'] p.font-medium.text-balance"
+        const val SELECTOR_PLAYER_LOOKUP_ERROR = "form:has(#playerId) p.text-red-500"
+        const val BTN_REDEEM_CODE = "button[type='submit']:has-text('Redeem Gift Code')"
         const val SELECTOR_GIFT_CODE = "input[placeholder='Enter Gift Code']"
         const val SELECTOR_EXCHANGE_BTN = "div.btn.exchange_btn"
         const val SELECTOR_MODAL = "div.message_modal"
         const val SELECTOR_MODAL_MSG = "div.modal_content .msg"
-        const val SELECTOR_CONFIRM_BTN = "div.confirm_btn"
         const val SELECTOR_EXIT = "div.exit_con"
-        const val SELECTOR_PLAYER_NAME = "p.name"
     }
 
     /**
@@ -51,14 +49,25 @@ class RedemptionAutomator(
     ): Boolean {
         val playerId = player.playerId
         val playerName = player.playerName
-        val playerKingdom = player.kingdom.toString()
 
         logger.info("Processing user: {}", player.id)
 
-        // Step 1 — fill in user details
-
+        // Step 1 — look up the player
         page.fill(SELECTOR_PLAYER_ID, playerId)
-        page.fill(SELECTOR_KINGDOM, playerKingdom)
+        page.click(BTN_CONTINUE)
+
+        page.waitForSelector(
+            "$SELECTOR_PLAYER_CARD, $SELECTOR_PLAYER_LOOKUP_ERROR",
+            Page.WaitForSelectorOptions()
+                .setTimeout(automationConfig.timeoutMs.toDouble() * 5)
+        )
+
+        val playerCardElement = page.querySelector(SELECTOR_PLAYER_CARD)
+        if (playerCardElement == null || !playerCardElement.isVisible) {
+            logger.warn("Player {} not found on kingshot.net — skipping", playerId)
+            exitUser(page)
+            return true
+        }
 
         // Step 2 — Redeem each code
         for (code in codes) {
@@ -72,7 +81,7 @@ class RedemptionAutomator(
                 continue
             }
 
-            val hardStop = redeemCodeWithRetry(page, playerId, playerKingdom, playerName, code)
+            val hardStop = redeemCodeWithRetry(page, playerId, playerName, code)
             if (hardStop) return false
         }
 
@@ -84,7 +93,6 @@ class RedemptionAutomator(
     private fun redeemCodeWithRetry(
         page: Page,
         playerId: String,
-        playerKingdom: String,
         playerName: String?,
         code: GiftCode
     ): Boolean {
@@ -98,7 +106,7 @@ class RedemptionAutomator(
             )
 
             // Write PENDING before attempting
-            val log = saveLog(playerId, playerName, playerKingdom, code.code, RedemptionStatus.PENDING, attempt, null)
+            val log = saveLog(playerId, playerName, code.code, RedemptionStatus.PENDING, attempt, null)
 
             val status = attemptRedemption(page, code.code)
 
@@ -151,7 +159,7 @@ class RedemptionAutomator(
             val modalText = page.innerText(SELECTOR_MODAL_MSG)
             val status = RedemptionStatus.fromMessage(modalText)
 
-            page.click(SELECTOR_CONFIRM_BTN)
+            page.click(BTN_REDEEM_CODE)
             status
 
         } catch (e: Exception) {
@@ -173,7 +181,6 @@ class RedemptionAutomator(
     fun saveLog(
         userId: String,
         playerName: String?,
-        playerKingdom: String?,
         code: String,
         status: RedemptionStatus,
         attemptNumber: Int,
@@ -183,7 +190,6 @@ class RedemptionAutomator(
             RedemptionLog(
                 userId = userId,
                 player = playerName,
-                kingdom = playerKingdom,
                 code = code,
                 status = status,
                 attemptNumber = attemptNumber,
@@ -214,35 +220,20 @@ class RedemptionAutomator(
             return try {
                 page.navigate(REDEMPTION_URL)
                 page.fill(SELECTOR_PLAYER_ID, userId)
+                page.click(BTN_CONTINUE)
 
+                // Wait for either the player card (success) or an inline lookup error
                 page.waitForSelector(
-                    SELECTOR_LOGIN_BTN_ACTIVE,
-                    Page.WaitForSelectorOptions()
-                        .setState(WaitForSelectorState.VISIBLE)
-                        .setTimeout(automationConfig.timeoutMs.toDouble())
-                )
-                page.click(SELECTOR_LOGIN_BTN)
-
-                // Wait for either player name (success) or modal (error)
-                page.waitForSelector(
-                    "$SELECTOR_PLAYER_NAME, $SELECTOR_MODAL",
+                    "$SELECTOR_PLAYER_CARD, $SELECTOR_PLAYER_LOOKUP_ERROR",
                     Page.WaitForSelectorOptions()
                         .setTimeout(automationConfig.timeoutMs.toDouble() * 5)
                 )
 
-                // Check if player name appeared (successful login)
-                val playerNameElement = page.querySelector(SELECTOR_PLAYER_NAME)
-                if (playerNameElement != null && playerNameElement.isVisible) {
-                    playerNameElement.innerText()
+                val playerCardElement = page.querySelector(SELECTOR_PLAYER_CARD)
+                if (playerCardElement != null && playerCardElement.isVisible) {
+                    playerCardElement.innerText()
                 } else {
-                    // Check for error modal
-                    val modalText = page.innerText(SELECTOR_MODAL_MSG)
-                    val status = RedemptionStatus.fromMessage(modalText)
-
-                    if (status in RedemptionStatus.SKIP_USER) {
-                        logger.warn("Player {} not found in KS", userId)
-                        page.click(SELECTOR_CONFIRM_BTN)
-                    }
+                    logger.warn("Player {} not found on kingshot.net", userId)
                     null // signals invalid player
                 }
 
