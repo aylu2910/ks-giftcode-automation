@@ -1,11 +1,8 @@
 package com.codewithore.ks_giftcode_automation.controller
 
-import com.codewithore.ks_giftcode_automation.client.PlayerInfoApiClient
-import com.codewithore.ks_giftcode_automation.client.RateLimitException
 import com.codewithore.ks_giftcode_automation.dto.AddPlayersRequest
 import com.codewithore.ks_giftcode_automation.dto.ApiResponse
 import com.codewithore.ks_giftcode_automation.dto.PlayerRegistrationResult
-import com.codewithore.ks_giftcode_automation.model.PlayerInfoData
 import com.codewithore.ks_giftcode_automation.repository.PlayerRepository
 import com.codewithore.ks_giftcode_automation.service.PlayerService
 import org.springframework.http.HttpStatus
@@ -17,7 +14,6 @@ import org.springframework.web.bind.annotation.*
 class PlayerController(
     private val playerService: PlayerService,
     private val playerRepository: PlayerRepository,
-    private val playerInfoApiClient: PlayerInfoApiClient,
 ) {
 
     @GetMapping
@@ -52,33 +48,14 @@ class PlayerController(
                 )
             }
 
-            // Validate via API
-            val playerInfo: PlayerInfoData
-            try {
-                val result = playerInfoApiClient.getPlayerInfo(playerIdStr) ?: return@map PlayerRegistrationResult(
-                    playerId = playerIdStr,
-                    success = false,
-                    message = "Player ID $playerId not found in Kingshot"
-                )
-                playerInfo = result
-            } catch (e: RateLimitException) {
-                return@map PlayerRegistrationResult(
-                    playerId = playerIdStr,
-                    success = false,
-                    message = "Rate limited — please try again later"
-                )
-            }
-
             // Save to DB with in-game name and kingdom
-            runCatching { playerService.addPlayer(playerIdStr, playerInfo.name, playerInfo.kingdom.toString()) }
+            runCatching { playerService.addPlayer(playerIdStr) }
                 .fold(
                     onSuccess = {
                         PlayerRegistrationResult(
                             playerId = playerIdStr,
-                            playerKingdom = playerInfo.kingdom.toString(),
                             success = true,
-                            playerName = playerInfo.name,
-                            message = "Player $playerId (${playerInfo.name}) added successfully"
+                            message = "Player $playerId added successfully"
                         )
                     },
                     onFailure = {

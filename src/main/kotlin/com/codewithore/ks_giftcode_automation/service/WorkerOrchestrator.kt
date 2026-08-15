@@ -1,6 +1,7 @@
 package com.codewithore.ks_giftcode_automation.service
 
 import com.codewithore.ks_giftcode_automation.config.AutomationConfig
+import com.codewithore.ks_giftcode_automation.entity.Player
 import com.codewithore.ks_giftcode_automation.model.GiftCode
 import com.microsoft.playwright.Playwright
 import kotlinx.coroutines.Dispatchers
@@ -19,9 +20,9 @@ class WorkerOrchestrator(
 
     private val logger = LoggerFactory.getLogger(WorkerOrchestrator::class.java)
 
-    suspend fun orchestrate(userIds: List<String>, codes: List<GiftCode>) {
-        if (userIds.isEmpty()) {
-            logger.warn("No users to process — skipping orchestration")
+    suspend fun orchestrate(players: List<Player>, codes: List<GiftCode>) {
+        if (players.isEmpty()) {
+            logger.warn("No players to process — skipping orchestration")
             return
         }
 
@@ -34,13 +35,13 @@ class WorkerOrchestrator(
         // If any worker hits INVALID_CODE, all workers stop processing that code
         val hardStop = AtomicBoolean(false)
 
-        // Split users into chunks — one chunk per worker
-        val chunkSize = maxOf(1, userIds.size / automationConfig.workers)
-        val chunks = userIds.chunked(chunkSize)
+        // Split players into chunks — one chunk per worker
+        val chunkSize = maxOf(1, players.size / automationConfig.workers)
+        val chunks = players.chunked(chunkSize)
 
         logger.info(
-            "Starting orchestration — {} users, {} codes, {} workers",
-            userIds.size, codes.size, chunks.size
+            "Starting orchestration — {} players, {} codes, {} workers",
+            players.size, codes.size, chunks.size
         )
 
         supervisorScope {
@@ -48,7 +49,7 @@ class WorkerOrchestrator(
                 async(Dispatchers.IO) {
                     runWorker(
                         workerId = index + 1,
-                        userIds = chunk,
+                        players = chunk,
                         codes = codes,
                         hardStop = hardStop
                     )
@@ -61,11 +62,11 @@ class WorkerOrchestrator(
 
     private fun runWorker(
         workerId: Int,
-        userIds: List<String>,
+        players: List<Player>,
         codes: List<GiftCode>,
         hardStop: AtomicBoolean
     ) {
-        logger.info("Worker {} starting — {} users to process", workerId, userIds.size)
+        logger.info("Worker {} starting — {} players to process", workerId, players.size)
 
         Playwright.create().use { playwright ->
             val browser = playwright.chromium().launch()
@@ -74,20 +75,20 @@ class WorkerOrchestrator(
                 val page = browser.newPage()
                 page.navigate(RedemptionAutomator.REDEMPTION_URL)
 
-                for (userId in userIds) {
+                for (player in players) {
                     if (hardStop.get()) {
-                        logger.warn("Worker {} — hard stop signal received, skipping user {}", workerId, userId)
+                        logger.warn("Worker {} — hard stop signal received, skipping player {}", workerId, player.playerId)
                         continue
                     }
 
                     val shouldContinue = redemptionAutomator.redeemAllCodesForUser(
                         page = page,
-                        userId = userId,
+                        player = player,
                         codes = codes
                     )
 
                     if (!shouldContinue) {
-                        logger.warn("Worker {} — hard stop triggered by user {}", workerId, userId)
+                        logger.warn("Worker {} — hard stop triggered by player {}", workerId, player.playerId)
                         hardStop.set(true)
                     }
                 }

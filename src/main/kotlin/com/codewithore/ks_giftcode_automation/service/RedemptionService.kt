@@ -43,19 +43,19 @@ class RedemptionService(
             }
             logger.info("Found {} gift codes to process", codes.size)
 
-            // Step 3 — Load users
-            val userIds = playerService.loadUserIds()
-            if (userIds.isEmpty()) {
-                logger.info("No users registered — skipping run")
+            // Step 3 — Load players
+            val players = playerService.getAllPlayers()
+            if (players.isEmpty()) {
+                logger.info("No players registered — skipping run")
                 return
             }
-            logger.info("Found {} users to process", userIds.size)
+            logger.info("Found {} players to process", players.size)
 
-            // Step 4 — Filter codes already redeemed by all users
+            // Step 4 — Filter codes already redeemed by all players
             val pendingCodes = codes.filter { code ->
                 val successCount = redemptionLogRepository
                     .countByCodeAndStatus(code.code, RedemptionStatus.SUCCESS)
-                successCount < playerService.getAllPlayers().size
+                successCount < players.size
             }
 
             if (pendingCodes.isEmpty()) {
@@ -66,7 +66,7 @@ class RedemptionService(
 
             // Step 5 — Orchestrate workers
             runBlocking {
-                workerOrchestrator.orchestrate(userIds, pendingCodes)
+                workerOrchestrator.orchestrate(players, pendingCodes)
             }
 
         } catch (e: Exception) {

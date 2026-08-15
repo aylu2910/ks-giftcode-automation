@@ -48,7 +48,6 @@ class RedemptionAutomator(
         codes: List<GiftCode>
     ): Boolean {
         val playerId = player.playerId
-        val playerName = player.playerName
 
         logger.info("Processing user: {}", player.id)
 
@@ -77,11 +76,11 @@ class RedemptionAutomator(
                     playerId, code.code, RedemptionStatus.SUCCESS
                 )
             ) {
-                logger.info("Skipping code {} for user {} - {} — already redeemed based on RedemptionStatus.SUCCESS", code.code, playerId, playerName)
+                logger.info("Skipping code {} for user {} - {} — already redeemed based on RedemptionStatus.SUCCESS", code.code, playerId)
                 continue
             }
 
-            val hardStop = redeemCodeWithRetry(page, playerId, playerName, code)
+            val hardStop = redeemCodeWithRetry(page, playerId, code)
             if (hardStop) return false
         }
 
@@ -93,7 +92,6 @@ class RedemptionAutomator(
     private fun redeemCodeWithRetry(
         page: Page,
         playerId: String,
-        playerName: String?,
         code: GiftCode
     ): Boolean {
         var attempt = 1
@@ -106,7 +104,7 @@ class RedemptionAutomator(
             )
 
             // Write PENDING before attempting
-            val log = saveLog(playerId, playerName, code.code, RedemptionStatus.PENDING, attempt, null)
+            val log = saveLog(playerId, code.code, RedemptionStatus.PENDING, attempt, null)
 
             val status = attemptRedemption(page, code.code)
 
@@ -115,7 +113,7 @@ class RedemptionAutomator(
 
             when {
                 status == RedemptionStatus.SUCCESS -> {
-                    logger.info("✅ Code {} redeemed for user {} - {}", code.code, playerId, playerName)
+                    logger.info("✅ Code {} redeemed for user {} - {}", code.code, playerId)
                     return false
                 }
                 status in RedemptionStatus.HARD_STOP -> {
@@ -123,20 +121,20 @@ class RedemptionAutomator(
                     return true
                 }
                 status == RedemptionStatus.ALREADY_REDEEMED -> {
-                    logger.info("⏭️ Code {} already redeemed for user {} - {}", code.code, playerId, playerName)
+                    logger.info("⏭️ Code {} already redeemed for user {} - {}", code.code, playerId)
                     return false
                 }
                 status in RedemptionStatus.RETRYABLE && attempt < retryConfig.maxAttempts -> {
                     logger.warn(
                         "⚠️ Retryable error for code {} user {} - {} — waiting {}ms",
-                        code.code, playerId, playerName, delayMs
+                        code.code, playerId, delayMs
                     )
                     Thread.sleep(delayMs)
                     delayMs *= retryConfig.backoffMultiplier
                     attempt++
                 }
                 else -> {
-                    logger.error("❌ Code {} failed for user {} - {} after {} attempts", code.code, playerId, playerName, attempt)
+                    logger.error("❌ Code {} failed for user {} - {} after {} attempts", code.code, playerId, attempt)
                     updateLog(log, RedemptionStatus.FAILED)
                     return false
                 }
@@ -180,7 +178,6 @@ class RedemptionAutomator(
     @Transactional
     fun saveLog(
         userId: String,
-        playerName: String?,
         code: String,
         status: RedemptionStatus,
         attemptNumber: Int,
@@ -189,7 +186,6 @@ class RedemptionAutomator(
         return redemptionLogRepository.save(
             RedemptionLog(
                 userId = userId,
-                player = playerName,
                 code = code,
                 status = status,
                 attemptNumber = attemptNumber,
