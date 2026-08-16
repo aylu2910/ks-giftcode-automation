@@ -109,7 +109,7 @@ class RedemptionAutomator(
 
             when {
                 status == RedemptionStatus.SUCCESS -> {
-                    logger.info("✅ Code {} redeemed for user {} - {}", code.code, playerId)
+                    logger.info("✅ Code {} redeemed for user {} ", code.code, playerId)
                     return false
                 }
                 status in RedemptionStatus.HARD_STOP -> {
@@ -117,12 +117,12 @@ class RedemptionAutomator(
                     return true
                 }
                 status == RedemptionStatus.ALREADY_REDEEMED -> {
-                    logger.info("⏭️ Code {} already redeemed for user {} - {}", code.code, playerId)
+                    logger.info("⏭️ Code {} already redeemed for user {} ", code.code, playerId)
                     return false
                 }
                 status in RedemptionStatus.RETRYABLE && attempt < retryConfig.maxAttempts -> {
                     logger.warn(
-                        "⚠️ Retryable error for code {} user {} - {} — waiting {}ms",
+                        "⚠️ Retryable error for code {} user {} — waiting {}ms",
                         code.code, playerId, delayMs
                     )
                     Thread.sleep(delayMs)
@@ -130,7 +130,7 @@ class RedemptionAutomator(
                     attempt++
                 }
                 else -> {
-                    logger.error("❌ Code {} failed for user {} - {} after {} attempts", code.code, playerId, attempt)
+                    logger.error("❌ Code {} failed for user {} after {} attempts", code.code, playerId, attempt)
                     updateLog(log, RedemptionStatus.FAILED)
                     return false
                 }
