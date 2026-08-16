@@ -73,7 +73,7 @@ class RedemptionAutomator(
                     playerId, code.code, RedemptionStatus.SUCCESS
                 )
             ) {
-                logger.info("Skipping code {} for user {} - {} — already redeemed based on RedemptionStatus.SUCCESS", code.code, playerId)
+                logger.info("Skipping code {} for user {} — already redeemed based on RedemptionStatus.SUCCESS", code.code, playerId)
                 continue
             }
 
@@ -190,39 +190,5 @@ class RedemptionAutomator(
                     status.message else null
             )
         )
-    }
-    fun validatePlayer(userId: String): String? {
-
-        Playwright.create().use { playwright ->
-            val browser = playwright.chromium().launch()
-            val page = browser.newPage()
-
-            return try {
-                page.navigate(REDEMPTION_URL)
-                page.fill(SELECTOR_PLAYER_ID, userId)
-                page.click(BTN_CONTINUE)
-
-                // Wait for either the player card (success) or an inline lookup error
-                page.waitForSelector(
-                    "$SELECTOR_PLAYER_CARD, $SELECTOR_PLAYER_LOOKUP_ERROR",
-                    Page.WaitForSelectorOptions()
-                        .setTimeout(automationConfig.timeoutMs.toDouble() * 5)
-                )
-
-                val playerCardElement = page.querySelector(SELECTOR_PLAYER_CARD)
-                if (playerCardElement != null && playerCardElement.isVisible) {
-                    playerCardElement.innerText()
-                } else {
-                    logger.warn("Player {} not found on kingshot.net", userId)
-                    null // signals invalid player
-                }
-
-            } catch (e: Exception) {
-                logger.error("Error validating player {}: {}", userId, e.message)
-                null
-            } finally {
-                browser.close()
-            }
-        }
     }
 }
