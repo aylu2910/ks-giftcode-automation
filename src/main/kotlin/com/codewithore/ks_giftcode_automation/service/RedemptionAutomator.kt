@@ -30,11 +30,10 @@ class RedemptionAutomator(
         const val SELECTOR_PLAYER_CARD = "[data-slot='card-content'] p.font-medium.text-balance"
         const val SELECTOR_PLAYER_LOOKUP_ERROR = "form:has(#playerId) p.text-red-500"
         const val BTN_REDEEM_CODE = "button[type='submit']:has-text('Redeem Gift Code')"
-        const val SELECTOR_GIFT_CODE = "input[placeholder='Enter Gift Code']"
-        const val SELECTOR_EXCHANGE_BTN = "div.btn.exchange_btn"
+        const val SELECTOR_GIFT_CODE = "##giftCode"
         const val SELECTOR_MODAL = "div.message_modal"
         const val SELECTOR_MODAL_MSG = "div.modal_content .msg"
-        const val SELECTOR_EXIT = "div.exit_con"
+        const val SELECTOR_GIFT_CODE_RESULT = "form:has(#giftCode) p.text-red-500"
     }
 
     /**
@@ -64,7 +63,6 @@ class RedemptionAutomator(
         val playerCardElement = page.querySelector(SELECTOR_PLAYER_CARD)
         if (playerCardElement == null || !playerCardElement.isVisible) {
             logger.warn("Player {} not found on kingshot.net — skipping", playerId)
-            exitUser(page)
             return true
         }
 
@@ -85,7 +83,6 @@ class RedemptionAutomator(
         }
 
         // Step 3 — Exit to reset form for next user
-        exitUser(page)
         return true
     }
 
@@ -146,7 +143,7 @@ class RedemptionAutomator(
     private fun attemptRedemption(page: Page, code: String): RedemptionStatus {
         return try {
             page.fill(SELECTOR_GIFT_CODE, code)
-            page.click(SELECTOR_EXCHANGE_BTN)
+            page.click(BTN_REDEEM_CODE)
 
             page.waitForSelector(
                 SELECTOR_MODAL,
@@ -163,15 +160,6 @@ class RedemptionAutomator(
         } catch (e: Exception) {
             logger.error("Playwright error during redemption: {}", e.message)
             RedemptionStatus.UNKNOWN_ERROR
-        }
-    }
-
-    private fun exitUser(page: Page) {
-        try {
-            page.click(SELECTOR_EXIT)
-        } catch (e: Exception) {
-            logger.warn("Could not click exit button — navigating to URL instead")
-            page.navigate(REDEMPTION_URL)
         }
     }
 
