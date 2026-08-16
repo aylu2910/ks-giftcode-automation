@@ -31,7 +31,6 @@ class RedemptionAutomator(
         const val SELECTOR_PLAYER_LOOKUP_ERROR = "form:has(#playerId) p.text-red-500"
         const val BTN_REDEEM_CODE = "button[type='submit']:has-text('Redeem Gift Code')"
         const val SELECTOR_GIFT_CODE = "##giftCode"
-        const val SELECTOR_MODAL = "div.message_modal"
         const val SELECTOR_MODAL_MSG = "div.modal_content .msg"
         const val SELECTOR_GIFT_CODE_RESULT = "form:has(#giftCode) p.text-red-500"
     }
@@ -146,16 +145,13 @@ class RedemptionAutomator(
             page.click(BTN_REDEEM_CODE)
 
             page.waitForSelector(
-                SELECTOR_MODAL,
+                SELECTOR_GIFT_CODE_RESULT,
                 Page.WaitForSelectorOptions()
                     .setTimeout(automationConfig.timeoutMs.toDouble() * 5)
             )
 
-            val modalText = page.innerText(SELECTOR_MODAL_MSG)
-            val status = RedemptionStatus.fromMessage(modalText)
-
-            page.click(BTN_REDEEM_CODE)
-            status
+            val resultText = page.innerText(SELECTOR_GIFT_CODE_RESULT)
+            RedemptionStatus.fromMessage(resultText)
 
         } catch (e: Exception) {
             logger.error("Playwright error during redemption: {}", e.message)
