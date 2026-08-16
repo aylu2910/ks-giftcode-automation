@@ -48,7 +48,6 @@ class PlayerController(
                 )
             }
 
-            // Save to DB with in-game name and kingdom
             runCatching { playerService.addPlayer(playerIdStr) }
                 .fold(
                     onSuccess = {
@@ -61,7 +60,6 @@ class PlayerController(
                     onFailure = {
                         PlayerRegistrationResult(
                             playerId = playerIdStr,
-                            playerKingdom = null,
                             success = false,
                             message = it.message ?: "Unknown error"
                         )
