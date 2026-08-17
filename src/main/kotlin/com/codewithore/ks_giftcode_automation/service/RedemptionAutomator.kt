@@ -8,7 +8,6 @@ import com.codewithore.ks_giftcode_automation.model.GiftCode
 import com.codewithore.ks_giftcode_automation.model.RedemptionStatus
 import com.codewithore.ks_giftcode_automation.repository.RedemptionLogRepository
 import com.microsoft.playwright.Page
-import com.microsoft.playwright.Playwright
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,7 +30,6 @@ class RedemptionAutomator(
         const val SELECTOR_PLAYER_LOOKUP_ERROR = "form:has(#playerId) p.text-red-500"
         const val BTN_REDEEM_CODE = "button[type='submit']:has-text('Redeem Gift Code')"
         const val SELECTOR_GIFT_CODE = "##giftCode"
-        const val SELECTOR_MODAL_MSG = "div.modal_content .msg"
         const val SELECTOR_GIFT_CODE_RESULT = "form:has(#giftCode) p.text-red-500"
     }
 
