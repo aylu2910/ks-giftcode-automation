@@ -57,12 +57,6 @@ class RedemptionAutomator(
                 .setTimeout(automationConfig.timeoutMs.toDouble() * 5)
         )
 
-        val playerCardElement = page.querySelector(SELECTOR_PLAYER_CARD)
-        if (playerCardElement == null || !playerCardElement.isVisible) {
-            logger.warn("Player {} not found on kingshot.net — skipping", playerId)
-            return true
-        }
-
         // Step 2 — Redeem each code
         for (code in codes) {
 
